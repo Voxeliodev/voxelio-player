@@ -7,13 +7,15 @@
     "start": "electron .",
     "dev": "electron .",
     "build": "electron-builder",
-    "build:win": "electron-builder --win"
+    "build:win": "electron-builder --win",
+    "release": "electron-builder --win --publish always"
   },
   "author": "Voxelio",
   "license": "MIT",
   "devDependencies": {
     "electron": "^31.0.0",
-    "electron-builder": "^24.13.3"
+    "electron-builder": "^24.13.3",
+    "electron-updater": "^6.1.7"
   },
   "build": {
     "appId": "com.voxelio.player",
@@ -50,6 +52,12 @@
       "createStartMenuShortcut": true,
       "shortcutName": "Voxelio",
       "include": "build/installer.nsh"
+    },
+    "publish": {
+      "provider": "github",
+      "owner": "VoxelioDev",
+      "repo": "voxelio-player",
+      "releaseType": "release"
     }
   }
 }

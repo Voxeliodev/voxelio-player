@@ -139,6 +139,58 @@
     <div id="status-spinner" class="spinner" style="display: none;"></div>
   </div>
 
+  <!-- ===== UPDATE TOAST ===== -->
+  <div id="update-toast" style="
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    z-index: 150;
+    background: linear-gradient(135deg, rgba(20,10,40,0.95), rgba(10,5,30,0.95));
+    border: 1px solid rgba(139, 95, 255, 0.5);
+    border-radius: 12px;
+    padding: 14px 18px;
+    max-width: 320px;
+    box-shadow: 0 12px 40px rgba(0,0,0,0.6), 0 0 30px rgba(139,95,255,0.2);
+    display: none;
+    font-size: 13px;
+    font-family: system-ui, -apple-system, sans-serif;
+  ">
+    <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 8px;">
+      <span style="font-size: 20px;">⬇️</span>
+      <strong style="font-size: 14px;">Update Available</strong>
+    </div>
+    <div id="update-msg" style="color: rgba(255,255,255,0.75); line-height: 1.4;">
+      Downloading…
+    </div>
+    <div id="update-progress-bar" style="
+      height: 4px;
+      background: rgba(255,255,255,0.1);
+      border-radius: 999px;
+      margin-top: 12px;
+      overflow: hidden;
+    ">
+      <div id="update-progress-fill" style="
+        height: 100%;
+        width: 0%;
+        background: linear-gradient(90deg, #8B5FFF, #00E5FF);
+        transition: width 0.3s ease;
+      "></div>
+    </div>
+    <button id="update-restart" style="
+      display: none;
+      margin-top: 12px;
+      width: 100%;
+      background: linear-gradient(180deg, #22C55E, #16A34A);
+      border: 2px solid #15803D;
+      color: white;
+      font-weight: 900;
+      font-size: 13px;
+      padding: 8px 16px;
+      border-radius: 8px;
+      cursor: pointer;
+    ">Restart to Update</button>
+  </div>
+
   <script>
     const gameFrame = document.getElementById("game-frame");
     const exitButton = document.getElementById("exit-button");
@@ -150,6 +202,12 @@
     const statusTitle = document.getElementById("status-title");
     const statusSub = document.getElementById("status-sub");
     const statusSpinner = document.getElementById("status-spinner");
+
+    const updateToast = document.getElementById("update-toast");
+    const updateMsg = document.getElementById("update-msg");
+    const updateProgressBar = document.getElementById("update-progress-bar");
+    const updateProgressFill = document.getElementById("update-progress-fill");
+    const updateRestart = document.getElementById("update-restart");
 
     let gameLoaded = false;
 
@@ -179,7 +237,7 @@
       exitButton.style.display = "none";
     }
 
-    // ===== Receive the game URL from the main process =====
+    // ===== Game loading =====
     window.voxelio.onLoadUrl(({ url }) => {
       setStatus({
         icon: "🌍",
@@ -192,6 +250,29 @@
 
     window.voxelio.onLoadError(({ error }) => {
       showError(error);
+    });
+
+    // ===== Update UI =====
+    window.voxelio.onUpdateAvailable(({ version }) => {
+      updateToast.style.display = "block";
+      updateMsg.textContent = `Downloading version ${version}…`;
+    });
+
+    window.voxelio.onUpdateProgress(({ percent }) => {
+      updateToast.style.display = "block";
+      updateMsg.textContent = `Downloading update… ${Math.round(percent)}%`;
+      updateProgressFill.style.width = `${percent}%`;
+    });
+
+    window.voxelio.onUpdateDownloaded(({ version }) => {
+      updateToast.style.display = "block";
+      updateMsg.textContent = `Version ${version} is ready to install.`;
+      updateProgressBar.style.display = "none";
+      updateRestart.style.display = "block";
+    });
+
+    updateRestart.addEventListener("click", () => {
+      window.voxelio.installUpdate();
     });
 
     // ===== Exit handling =====

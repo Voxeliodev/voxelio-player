@@ -1,9 +1,10 @@
-﻿// ============================================================
+// ============================================================
 // VOXELIO PLAYER — Electron main process
 // ============================================================
 
 const { app, BrowserWindow, ipcMain } = require("electron");
 const path = require("path");
+const { autoUpdater } = require("electron-updater");
 
 app.setName("Voxelio");
 app.setAppUserModelId("com.voxelio.player");
@@ -11,6 +12,42 @@ app.setAppUserModelId("com.voxelio.player");
 const VOXELIO_URL = "https://voxelio.vercel.app";
 const GAME_WIDTH = 1280;
 const GAME_HEIGHT = 720;
+
+// ============================================================
+// AUTO-UPDATER CONFIG
+// ============================================================
+autoUpdater.autoDownload = true;
+autoUpdater.autoInstallOnAppQuit = true;
+
+autoUpdater.on("checking-for-update", () => {
+  console.log("[updater] checking for update…");
+});
+autoUpdater.on("update-available", (info) => {
+  console.log("[updater] update available:", info.version);
+  if (mainWindow) {
+    mainWindow.webContents.send("update-available", { version: info.version });
+  }
+});
+autoUpdater.on("update-not-available", () => {
+  console.log("[updater] no update available");
+});
+autoUpdater.on("error", (err) => {
+  console.error("[updater] error:", err);
+});
+autoUpdater.on("download-progress", (progress) => {
+  console.log(`[updater] download: ${Math.round(progress.percent)}%`);
+  if (mainWindow) {
+    mainWindow.webContents.send("update-progress", {
+      percent: progress.percent,
+    });
+  }
+});
+autoUpdater.on("update-downloaded", (info) => {
+  console.log("[updater] update downloaded:", info.version);
+  if (mainWindow) {
+    mainWindow.webContents.send("update-downloaded", { version: info.version });
+  }
+});
 
 // ---- Single instance lock ----
 const gotTheLock = app.requestSingleInstanceLock();
@@ -30,6 +67,20 @@ if (!gotTheLock) {
   app.whenReady().then(() => {
     registerProtocol();
     createWindow();
+
+    // Check for updates on startup (after 5 seconds)
+    setTimeout(() => {
+      autoUpdater.checkForUpdatesAndNotify().catch((err) => {
+        console.error("[updater] check failed:", err);
+      });
+    }, 5000);
+
+    // Then check every hour
+    setInterval(() => {
+      autoUpdater.checkForUpdatesAndNotify().catch((err) => {
+        console.error("[updater] check failed:", err);
+      });
+    }, 60 * 60 * 1000);
   });
 }
 
@@ -92,7 +143,6 @@ function createWindow() {
     mainWindow = null;
   });
 
-  // If launched with a voxelio:// URL, tell the renderer to load it
   const initialUrl = extractVoxelioUrl(process.argv);
   if (initialUrl) {
     setTimeout(() => loadGameFromUrl(initialUrl), 300);
@@ -100,10 +150,7 @@ function createWindow() {
 }
 
 // ============================================================
-// GAME LOADING — NO TOKEN EXCHANGE HERE
-// ============================================================
-// The deep link now contains BOTH the token AND the world ID:
-//   voxelio://launch?token=XXX&world=chaos-coliseum
+// GAME LOADING
 // ============================================================
 function loadGameFromUrl(url) {
   if (!mainWindow) return;
@@ -143,6 +190,10 @@ ipcMain.on("close-app", () => {
   if (mainWindow) {
     mainWindow.close();
   }
+});
+
+ipcMain.on("install-update", () => {
+  autoUpdater.quitAndInstall();
 });
 
 // ============================================================
