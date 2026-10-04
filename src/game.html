@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Voxelio</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body {
+      width: 100%;
+      height: 100%;
+      background: #0A0A1E;
+      overflow: hidden;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color: white;
+    }
+    #game-frame {
+      position: fixed;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      border: none;
+      background: #0A0A1E;
+      display: none;
+    }
+    #exit-button {
+      position: fixed;
+      top: 12px;
+      left: 12px;
+      z-index: 100;
+      background: rgba(0,0,0,0.7);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      border: 1px solid rgba(255,255,255,0.2);
+      border-radius: 8px;
+      color: white;
+      font-size: 12px;
+      font-weight: 700;
+      padding: 8px 14px;
+      cursor: pointer;
+      display: none;
+      align-items: center;
+      gap: 6px;
+      opacity: 0.5;
+      transition: opacity 0.2s;
+    }
+    #exit-button:hover { opacity: 1; }
+    #confirm-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.75);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 200;
+    }
+    #confirm-overlay.visible { display: flex; }
+    .confirm-card {
+      background: linear-gradient(160deg, #1A1A2E 0%, #0F0F22 50%, #0A0A1E 100%);
+      border: 2px solid rgba(139, 95, 255, 0.4);
+      box-shadow: 0 20px 60px rgba(0,0,0,0.8), 0 0 40px rgba(139,95,255,0.2);
+      border-radius: 16px;
+      padding: 28px 32px;
+      max-width: 400px;
+      text-align: center;
+    }
+    .confirm-card h2 { font-size: 20px; font-weight: 900; margin-bottom: 8px; }
+    .confirm-card p { font-size: 14px; color: rgba(255,255,255,0.65); margin-bottom: 24px; line-height: 1.5; }
+    .confirm-buttons { display: flex; gap: 8px; justify-content: center; }
+    .btn {
+      border-radius: 10px;
+      padding: 10px 20px;
+      font-size: 14px;
+      font-weight: 900;
+      cursor: pointer;
+      border: none;
+    }
+    .btn-exit {
+      background: linear-gradient(180deg, #EF4444 0%, #DC2626 100%);
+      color: white;
+      border: 2px solid #991B1B;
+      box-shadow: 0 4px 12px rgba(239,68,68,0.4);
+    }
+    .btn-cancel {
+      background: rgba(255,255,255,0.08);
+      color: rgba(255,255,255,0.85);
+      border: 1px solid rgba(255,255,255,0.15);
+    }
+    #status-screen {
+      position: fixed;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 20px;
+      padding: 32px;
+      text-align: center;
+    }
+    #status-screen.hidden { display: none; }
+    #status-icon { font-size: 72px; }
+    #status-title { font-size: 24px; font-weight: 900; letter-spacing: 0.02em; }
+    #status-sub { font-size: 14px; color: rgba(255,255,255,0.6); max-width: 400px; line-height: 1.5; }
+    .spinner {
+      width: 40px;
+      height: 40px;
+      border: 4px solid rgba(255,255,255,0.15);
+      border-top-color: #8B5FFF;
+      border-radius: 50%;
+      animation: spin 0.9s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+  <iframe id="game-frame" allow="fullscreen" allowfullscreen></iframe>
+
+  <button id="exit-button">
+    <span style="font-size: 14px;">✕</span>
+    <span>Exit</span>
+  </button>
+
+  <div id="confirm-overlay">
+    <div class="confirm-card">
+      <h2>Leave the game?</h2>
+      <p>You&apos;ll be returned to the Voxelio website.</p>
+      <div class="confirm-buttons">
+        <button class="btn btn-exit" id="confirm-yes">Exit</button>
+        <button class="btn btn-cancel" id="confirm-no">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="status-screen">
+    <div id="status-icon">🎮</div>
+    <div id="status-title">VOXELIO</div>
+    <div id="status-sub">Waiting for a game to launch…</div>
+    <div id="status-spinner" class="spinner" style="display: none;"></div>
+  </div>
+
+  <script>
+    const gameFrame = document.getElementById("game-frame");
+    const exitButton = document.getElementById("exit-button");
+    const confirmOverlay = document.getElementById("confirm-overlay");
+    const confirmYes = document.getElementById("confirm-yes");
+    const confirmNo = document.getElementById("confirm-no");
+    const statusScreen = document.getElementById("status-screen");
+    const statusIcon = document.getElementById("status-icon");
+    const statusTitle = document.getElementById("status-title");
+    const statusSub = document.getElementById("status-sub");
+    const statusSpinner = document.getElementById("status-spinner");
+
+    let gameLoaded = false;
+
+    function setStatus({ icon, title, sub, spinner }) {
+      statusScreen.classList.remove("hidden");
+      if (icon !== undefined) statusIcon.textContent = icon;
+      if (title !== undefined) statusTitle.textContent = title;
+      if (sub !== undefined) statusSub.textContent = sub;
+      if (spinner !== undefined) statusSpinner.style.display = spinner ? "block" : "none";
+    }
+
+    function showGame(url) {
+      gameLoaded = true;
+      gameFrame.src = url;
+      gameFrame.style.display = "block";
+      statusScreen.classList.add("hidden");
+      exitButton.style.display = "flex";
+    }
+
+    function showError(message) {
+      setStatus({
+        icon: "⚠️",
+        title: "Launch Failed",
+        sub: message,
+        spinner: false,
+      });
+      exitButton.style.display = "none";
+    }
+
+    // ===== Receive the game URL from the main process =====
+    window.voxelio.onLoadUrl(({ url }) => {
+      setStatus({
+        icon: "🌍",
+        title: "Loading Game",
+        sub: "Preparing the world…",
+        spinner: true,
+      });
+      showGame(url);
+    });
+
+    window.voxelio.onLoadError(({ error }) => {
+      showError(error);
+    });
+
+    // ===== Exit handling =====
+    function showConfirm() { confirmOverlay.classList.add("visible"); }
+    function hideConfirm() { confirmOverlay.classList.remove("visible"); }
+
+    exitButton.addEventListener("click", showConfirm);
+    confirmYes.addEventListener("click", () => window.voxelio.closeApp());
+    confirmNo.addEventListener("click", hideConfirm);
+
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape") {
+        if (confirmOverlay.classList.contains("visible")) {
+          hideConfirm();
+        } else if (gameLoaded) {
+          showConfirm();
+        }
+      }
+    });
+  </script>
+</body>
+</html>
